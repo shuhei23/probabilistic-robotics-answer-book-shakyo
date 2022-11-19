@@ -4,7 +4,7 @@ import math
 import matplotlib.patches as patches
 import numpy as np
 import matplotlib
-#matplotlib.use('nbagg')
+#matplotlib.use('nbagg') #Jupyter上でのインタラクティブな画像表示を実現するための機能
 import matplotlib.animation as anm
 
 #from IPython.display import HTML # アニメーションが表示されないための処置
