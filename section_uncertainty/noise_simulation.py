@@ -12,6 +12,7 @@ class Robot(IdealRobot):
         self.theta_noise = norm(scale = noise_std)
         self.bias_rate_nu = norm.rvs(loc=1.0, scale=bias_rate_stds[0])
         self.bias_rate_omega = norm.rvs(loc=1.0, scale=bias_rate_stds[1])
+        # self.bias_rate_nu = 1.0 + 0.1 * (N(0,1) の乱数) 66.3% で　0.9 - 1.1 
         
     def noise(self, pose, nu, omega, time_interval):
         self.distance_until_noise -= abs(nu)*time_interval + self.r*abs(omega)*time_interval
@@ -29,7 +30,7 @@ class Robot(IdealRobot):
             return
         obs = self.sensor.data(self.pose) if self.sensor else None
         nu, omega = self.agent.decision(obs)
-        nu, omega = self.bias(nu, omega)
+        nu, omega = self.bias(nu, omega) # バイアスがかかった
         self.pose = self.state_transition(nu, omega, time_interval, self.pose)
         self.pose = self.noise(self.pose, nu, omega, time_interval) # 追加
 
