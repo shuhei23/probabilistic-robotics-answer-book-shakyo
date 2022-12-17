@@ -4,7 +4,7 @@ sequenceDiagram
     autonumber
     actor main
     participant world as World
-    participant robot as IdealRobot
+    participant robot as Robot
     participant sensor as IdealCamera
     participant agent as Agent
     main->>+world: draw()
