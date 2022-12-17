@@ -78,26 +78,38 @@ class Robot(IdealRobot):
             # Worldクラスのone_step()でIdealRobotクラスのdraw()を呼ぶ
             # IdealRobotクラスのdraw()でIdealCameraクラスのdraw()を呼ぶ
             # IdealCameraクラスのdraw()でself.lastdata を参照する
-        
+
+class Camera(IdealCamera):
+    def __init__(self, env_map, distance_range=(0.5, 6.0), direction_range=(-math.pi/3, math.pi/3), distance_noise_rate=0.1, direction_noise=math.pi/90):
+        super().__init__(env_map, distance_range, direction_range) # 元のinitを呼び出す
+
+        self.distance_noise_rate = distance_noise_rate
+        self.direction_noise = direction_noise
 
 ### 以下、実行処理 ###
 world = World(30,0.1)
 
+### 地図を生成してランドマークを追加
+m = Map()
+m.append_landmark(Landmark(-4, 2))
+m.append_landmark(Landmark(2, -3))
+m.append_landmark(Landmark(3, 3))
+world.append(m)
 
+### ロボットを作る
 circling = Agent(0.2, 10.0/180*math.pi)
-for i in range(0,100):
-    r = Robot(np.array([0,0,0]).T,sensor=None,agent=circling,color="gray",\
-            noise_per_meter=0,bias_rate_stds=(0.0,0.0),\
-            expected_kidnap_time=5)
-    world.append(r)
+r = Robot(np.array([0,0,0]).T,sensor=Camera(m),agent=circling)
+world.append(r)
     
 # nobias_robot = IdealRobot(np.array([0, 0, 0]).T, sensor=None, agent=circling, color="gray")
 # world.append(nobias_robot)
 # biased_robot = Robot(np.array([0, 0, 0]).T, sensor=None, agent=circling, color="red", noise_per_meter=0, bias_rate_stds=(0.2, 0.2))
 # world.append(biased_robot)
 
-r = IdealRobot(np.array([0,0,0]).T,sensor=None,agent=circling,color="red")
-world.append(r)
+# r = IdealRobot(np.array([0,0,0]).T,sensor=None,agent=circling,color="red")
+# world.append(r)
+
+### アニメーション実行
 world.draw()
 
 
