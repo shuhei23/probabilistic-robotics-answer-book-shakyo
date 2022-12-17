@@ -1,4 +1,5 @@
 import sys
+import math
 sys.path.append('../scripts/')
 from ideal_robot import *
 from scipy.stats import expon, norm, uniform
@@ -80,27 +81,39 @@ class Robot(IdealRobot):
             # IdealCameraクラスのdraw()でself.lastdata を参照する
 
 class Camera(IdealCamera):
-    def __init__(self, env_map, distance_range=(0.5, 6.0), direction_range=(-math.pi/3, math.pi/3), distance_noise_rate=0.1, direction_noise=math.pi/90):
+    def __init__(self, env_map, 
+        distance_range=(0.5, 6.0), 
+        direction_range=(-math.pi/3, math.pi/3), 
+        distance_noise_rate=0.1, direction_noise=math.pi/90,
+        distance_bias_rate_stddev = 0.1, direction_bias_stddev = math.pi/90):
         super().__init__(env_map, distance_range, direction_range) # 元のinitを呼び出す
 
         self.distance_noise_rate = distance_noise_rate
         self.direction_noise = direction_noise
+        self.distance_bias_rate_std = norm.rvs(scale = distance_bias_rate_stddev)
+        self.direction_bias = norm.rvs(scale = direction_bias_stddev)
 
     def noise(self, relpos):
         ell = norm.rvs(loc=relpos[0], scale=relpos[0]*self.distance_noise_rate)
         phi = norm.rvs(loc=relpos[1], scale=self.direction_noise)
         return np.array([ell, phi]).T
 
+    def bias(self, relpos):
+        return relpos + np.array([relpos[0]*self.distance_bias_rate_std, self.direction_bias]).T
+    
     def data(self, cam_pose):
         observed = []
         for lm in self.map.landmarks:
             z = self.observation_function(cam_pose, lm.pos)
             if self.visible(z):
+                z = self.bias(z)
                 z = self.noise(z)
                 observed.append((z, lm.id))
 
         self.lastdata = observed
         return observed
+
+
 
 
 ### 以下、実行処理 ###
