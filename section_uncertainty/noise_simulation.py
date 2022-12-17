@@ -86,6 +86,23 @@ class Camera(IdealCamera):
         self.distance_noise_rate = distance_noise_rate
         self.direction_noise = direction_noise
 
+    def noise(self, relpos):
+        ell = norm.rvs(loc=relpos[0], scale=relpos[0]*self.distance_noise_rate)
+        phi = norm.rvs(loc=relpos[1], scale=self.direction_noise)
+        return np.array([ell, phi]).T
+
+    def data(self, cam_pose):
+        observed = []
+        for lm in self.map.landmarks:
+            z = self.observation_function(cam_pose, lm.pos)
+            if self.visible(z):
+                z = self.noise(z)
+                observed.append((z, lm.id))
+
+        self.lastdata = observed
+        return observed
+
+
 ### 以下、実行処理 ###
 world = World(30,0.1)
 
