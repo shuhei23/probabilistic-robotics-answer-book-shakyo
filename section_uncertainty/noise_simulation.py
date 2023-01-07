@@ -87,7 +87,7 @@ class Camera(IdealCamera):
         distance_noise_rate=0.1, direction_noise=math.pi/90,
         distance_bias_rate_stddev = 0.1, direction_bias_stddev = math.pi/90,
         phantom_prob = 0.0, phantom_range_x =(-5.0, 5.0), phantom_range_y=(-5.0, 5.0),
-        oversight_prob=0.1 ): # init()の引数ここまで
+        oversight_prob=0.1, occlusion_prob = 0.0 ): # init()の引数ここまで
         super().__init__(env_map, distance_range, direction_range) # 元のinitを呼び出す
 
         self.distance_noise_rate = distance_noise_rate
@@ -98,6 +98,7 @@ class Camera(IdealCamera):
         self.phantom_dist = uniform(loc=(rx[0], ry[0]), scale = (rx[1]-rx[0], ry[1]-ry[0]))
         self.phantom_prob = phantom_prob
         self.oversight_prob = oversight_prob
+        self.occlusion_prob = occlusion_prob
 
     def noise(self, relpos):
         ell = norm.rvs(loc=relpos[0], scale=relpos[0]*self.distance_noise_rate)
@@ -120,11 +121,22 @@ class Camera(IdealCamera):
         else:
             return relpos
 
+    def occlusion(self, relpos): # 観測対象の大きさを画像処理で求めたいときに，通行者や何かに隠れて実際よりも小さく（遠く）見えるという現象
+        if uniform.rvs() < self.occlusion_prob:
+            ell = relpos[0] + uniform.rvs()*(self.distance_range[1] - relpos[0]) 
+            # (1-alpha) * relpose[0] + alpha * self.distance_range[1](=最大距離) と凸結合になっているので，
+            # 最大距離とrelpose[0]の間の値になる
+            phi = relpos[1]
+            return np.array([ell, phi]).T
+        else:
+            return relpos
+
     def data(self, cam_pose):
         observed = []
         for lm in self.map.landmarks:
             z = self.observation_function(cam_pose, lm.pos)
             z = self.phantom(cam_pose, z)
+            z = self.occlusion(z)
             z = self.oversight(z) # phantom も oversight しうる
             if self.visible(z):
                 z = self.bias(z)
