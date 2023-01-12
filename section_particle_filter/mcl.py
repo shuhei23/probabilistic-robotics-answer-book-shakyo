@@ -16,7 +16,7 @@ class Mcl: # Monte Carlo Localization
         ys=[p.pose[1] for p in self.particles]
         vxs=[math.cos(p.pose[2]) for p in self.particles]
         vys=[math.sin(p.pose[2]) for p in self.particles]
-        elems.append(ax.quiver(xs,ys,vxs,vys,color="blue",alph=0.5))
+        elems.append(ax.quiver(xs,ys,vxs,vys,color="blue",alpha=0.5))
         
 
 
