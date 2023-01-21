@@ -32,7 +32,7 @@ class World:
         elems = []
 
         if self.debug:
-            for i in range(1000):
+            for i in range(int(self.time_span/self.time_interval) + 1):
                 self.one_step(i, elems, ax) #デバッグ時はアニメーション表示させない
         else:
             self.anm = anm.FuncAnimation(fig, self.one_step, fargs=(elems, ax), frames=int(self.time_span/self.time_interval)+1, interval=int(self.time_interval*1000), repeat=False)
