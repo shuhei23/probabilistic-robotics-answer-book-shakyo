@@ -58,11 +58,12 @@ def trial(motion_noise_stds):
     ### ロボットを作る
     initial_pose = np.array([0,0,0]).T
     estimator = Mcl(initial_pose,100, motion_noise_stds)
-    circling = EstimationAgent(0.1, 0.2, 10.0/180*math.pi,estimator)
+    #circling = EstimationAgent(0.1, 0.2, 10.0/180*math.pi,estimator)
+    circling = EstimationAgent(0.1, 0.1, 0.0,estimator)
     r = Robot(initial_pose,agent=circling, color="red")
     world.append(r)
 
     ### アニメーション実行
     world.draw()
     
-trial({"nn": 0.01, "no": 0.02, "on": 0.03, "oo": 0.04})
+trial({"nn": 0.001, "no": 0.001, "on": 0.08, "oo": 0.001})
