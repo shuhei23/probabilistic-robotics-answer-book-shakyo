@@ -94,7 +94,7 @@ class IdealRobot:
 
 
     @classmethod
-    def state_transition(cls, nu, omega, time, pose): 
+    def state_transition(cls, nu, omega, time, pose): # 要するに状態方程式をオイラー法で近似したもの
         theta0 = pose[2]
         if math.fabs(omega) < 1e-10: # 角速度がほとんどゼロのとき
             return pose + np.array([nu*math.cos(theta0),nu*math.sin(theta0),omega]) * time

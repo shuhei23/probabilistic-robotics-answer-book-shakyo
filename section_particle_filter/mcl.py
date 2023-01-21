@@ -44,7 +44,7 @@ class EstimationAgent(Agent):
 
     def decision(self, observation=None):
         self.estimator.motion_update(self.prev_nu, self.prev_omega, self.time_interval)
-        self.prev_nu, self.prev_omega = self.nu, self.omega
+        self.prev_nu, self.prev_omega = self.nu, self.omega # パーティクルの前の値
         return self.nu, self.omega
     
     def draw(self,ax,elems):
