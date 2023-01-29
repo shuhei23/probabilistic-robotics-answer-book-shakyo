@@ -12,6 +12,9 @@ class Particle:
         noised_nu = nu + ns[0] * math.sqrt(abs(nu)/ time) + ns[1] * math.sqrt(abs(omega)/time)
         noised_omega = omega + ns[2] * math.sqrt(abs(nu)/ time) + ns[3] * math.sqrt(abs(omega)/ time)        
         self.pose = IdealRobot.state_transition(noised_nu, noised_omega, time, self.pose)
+    
+    def observation_update(self, observation):
+        print(observation)
 
 class Mcl: # Monte Carlo Localization
     def __init__(self,init_pose,num, motion_noise_stds={"nn":0.19, "no":0.001, "on":0.13, "oo": 0.2}):
@@ -31,7 +34,10 @@ class Mcl: # Monte Carlo Localization
         vxs=[math.cos(p.pose[2]) for p in self.particles]
         vys=[math.sin(p.pose[2]) for p in self.particles]
         elems.append(ax.quiver(xs,ys,vxs,vys,color="blue",alpha=0.5))
-        
+
+    def observation_update(self, observation):
+        for p in self.particles:
+            p.observation_update(observation)   
 
 class EstimationAgent(Agent):
     def __init__(self, time_interval, nu,omega,estimator):
@@ -45,25 +51,33 @@ class EstimationAgent(Agent):
     def decision(self, observation=None):
         self.estimator.motion_update(self.prev_nu, self.prev_omega, self.time_interval)
         self.prev_nu, self.prev_omega = self.nu, self.omega # パーティクルの前の値
+        self.estimator.observation_update(observation) # observationはsensor.data()の戻り値(IdealRobot.one_step()に書いてある)
         return self.nu, self.omega
     
     def draw(self,ax,elems):
         self.estimator.draw(ax,elems)
 
 
-def trial(motion_noise_stds):
+def trial():
     time_interval = 0.1
-    world = World(30,time_interval)
+    world = World(30,time_interval, debug=True)
+
+    m = Map()
+    for ln in [(-4,2),(2,-3),(3,3)]:
+        m.append_landmark(Landmark(*ln))
+        # Landmark は ideal_robot.py に書いてある
+        # *ln はアンパック: Landmark(*(-4,2)) = Landmark(-4,2)
+    world.append(m)
 
     ### ロボットを作る
     initial_pose = np.array([0,0,0]).T
-    estimator = Mcl(initial_pose,100, motion_noise_stds)
-    circling = EstimationAgent(0.1, 0.2, 10.0/180*math.pi,estimator)
+    estimator = Mcl(initial_pose,100)
+    circling = EstimationAgent(time_interval, 0.2, 10.0/180*math.pi,estimator)
     #circling = EstimationAgent(0.1, 0.1, 0.0,estimator)
-    r = Robot(initial_pose,agent=circling, color="red")
+    r = Robot(initial_pose, sensor=Camera(m), agent=circling, color="red")
     world.append(r)
 
     ### アニメーション実行
     world.draw()
     
-trial({"nn": 0.001, "no": 0.001, "on": 0.08, "oo": 0.001})
+trial()
