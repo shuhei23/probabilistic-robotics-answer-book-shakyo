@@ -14,13 +14,16 @@ class Particle:
         noised_omega = omega + ns[2] * math.sqrt(abs(nu)/ time) + ns[3] * math.sqrt(abs(omega)/ time)        
         self.pose = IdealRobot.state_transition(noised_nu, noised_omega, time, self.pose)
     
-    def observation_update(self, observation):
+    def observation_update(self, observation,envmap,distance_dev_rate,direction_dev):
         print(observation)
 
 class Mcl: # Monte Carlo Localization
-    def __init__(self,init_pose,num, motion_noise_stds={"nn":0.19, "no":0.001, "on":0.13, "oo": 0.2}):
+    def __init__(self,envmap,init_pose,num, motion_noise_stds={"nn":0.19, "no":0.001, "on":0.13, "oo": 0.2},distance_dev_rate=0.14,direction_dev=0.05):
         self.particles = [Particle(init_pose, 1.0/num) for i in range(num)]
-        
+        self.map = envmap
+        self.distance_dev_rate = distance_dev_rate
+        self.direction_dev = direction_dev
+
         v = motion_noise_stds
         c = np.diag([v["nn"] ** 2, v["no"]**2, v["on"]**2, v["oo"]**2])
         self.motion_noise_rate_pdf = multivariate_normal(cov=c) # 多変数共分散行列covから乱数ジェネレータを作成
@@ -32,13 +35,13 @@ class Mcl: # Monte Carlo Localization
     def draw(self,ax,elems):
         xs=[p.pose[0] for p in self.particles]
         ys=[p.pose[1] for p in self.particles]
-        vxs=[math.cos(p.pose[2]) for p in self.particles]
-        vys=[math.sin(p.pose[2]) for p in self.particles]
-        elems.append(ax.quiver(xs,ys,vxs,vys,color="blue",alpha=0.5))
+        vxs=[math.cos(p.pose[2])*p.weight*len(self.particles) for p in self.particles]
+        vys=[math.sin(p.pose[2])*p.weight*len(self.particles) for p in self.particles]
+        elems.append(ax.quiver(xs,ys,vxs,vys,angles='xy',scale_units='xy',scale=1.5,color="blue",alpha=0.5))
 
     def observation_update(self, observation):
         for p in self.particles:
-            p.observation_update(observation)   
+            p.observation_update(observation, self.map, self.distance_dev_rate, self.direction_dev)   
 
 class EstimationAgent(Agent):
     def __init__(self, time_interval, nu,omega,estimator):
@@ -61,7 +64,7 @@ class EstimationAgent(Agent):
 
 def trial():
     time_interval = 0.1
-    world = World(30,time_interval, debug=True)
+    world = World(30,time_interval, debug=False)
 
     m = Map()
     for ln in [(-4,2),(2,-3),(3,3)]:
@@ -72,7 +75,7 @@ def trial():
 
     ### ロボットを作る
     initial_pose = np.array([0,0,0]).T
-    estimator = Mcl(initial_pose,100)
+    estimator = Mcl(m,initial_pose,100)
     circling = EstimationAgent(time_interval, 0.2, 10.0/180*math.pi,estimator)
     #circling = EstimationAgent(0.1, 0.1, 0.0,estimator)
     r = Robot(initial_pose, sensor=Camera(m), agent=circling, color="red")
