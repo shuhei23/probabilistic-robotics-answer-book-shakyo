@@ -15,6 +15,21 @@ class Particle:
         self.pose = IdealRobot.state_transition(noised_nu, noised_omega, time, self.pose)
     
     def observation_update(self, observation,envmap,distance_dev_rate,direction_dev):
+        for d in observation:
+            obs_pos = d[0]
+            obs_id = d[1]
+
+            ###パーティクルの位置と地図からのランドマークの距離と方角を算出###
+            pos_on_map = envmap.landmarks[obs_id].pos
+            particle_suggest_pos = IdealCamera.observation_function(self.pose,pos_on_map)
+
+            ###尤度の計算###
+            distance_dev=distance_dev_rate*particle_suggest_pos[0]
+            cov=np.diag(np.array([distance_dev**2, direction_dev**2]))
+            self.weight *= multivariate_normal(mean=particle_suggest_pos, cov=cov).pdf(obs_pos)
+
+
+
         print(observation)
 
 class Mcl: # Monte Carlo Localization
@@ -83,3 +98,6 @@ def trial():
 
     ### アニメーション実行
     world.draw()
+
+if __name__ == '__main__':
+    trial()
