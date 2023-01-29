@@ -4,8 +4,9 @@ from robot import *
 from scipy.stats import multivariate_normal
 
 class Particle:
-    def __init__(self,init_pose):
+    def __init__(self,init_pose, weight):
         self.pose = init_pose
+        self.weight = weight
         
     def motion_update(self, nu, omega, time, noise_rate_pdf):
         ns = noise_rate_pdf.rvs() # 順にnn, no, on, oo
@@ -18,7 +19,7 @@ class Particle:
 
 class Mcl: # Monte Carlo Localization
     def __init__(self,init_pose,num, motion_noise_stds={"nn":0.19, "no":0.001, "on":0.13, "oo": 0.2}):
-        self.particles = [Particle(init_pose) for i in range(num)]
+        self.particles = [Particle(init_pose, 1.0/num) for i in range(num)]
         
         v = motion_noise_stds
         c = np.diag([v["nn"] ** 2, v["no"]**2, v["on"]**2, v["oo"]**2])
@@ -79,5 +80,3 @@ def trial():
 
     ### アニメーション実行
     world.draw()
-    
-trial()
