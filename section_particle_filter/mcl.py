@@ -65,7 +65,7 @@ class Mcl: # Monte Carlo Localization
         ps = random.choices(self.particles, weights=ws, k=len(self.particles))#wsの要素に比例した確率で、パーティクルをnum個選ぶ
         self.particles = [copy.deepcopy(e) for e in ps]
         for p in self.particles:
-            p.weight  1.0/len(self.particles) 
+            p.weight = 1.0/len(self.particles) 
             
 class EstimationAgent(Agent):
     def __init__(self, time_interval, nu,omega,estimator):
