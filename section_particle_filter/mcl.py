@@ -59,13 +59,40 @@ class Mcl: # Monte Carlo Localization
         self.resampling()
     
     def resampling(self):
-        ws = [e.weight for e in self.particles] 
+        # 系統サンプリング 手順1: 重みを累積して足していく（最後の要素が重みの合計になる。）, e.g., w = [1,0.5,1,2,2] なら np.cumsum(w) = array([1. , 1.5, 2.5, 4.5, 6.5])
+        ws = np.cumsum([e.weight for e in self.particles] ) 
         if sum(ws) < 1e-100:#重みのわがゼロに丸め込まれるとエラーになるので小さな数を足しておく
             ws = [e + 1e-100 for e in ws]
-        ps = random.choices(self.particles, weights=ws, k=len(self.particles))#wsの要素に比例した確率で、パーティクルをnum個選ぶ
+        
+        # 手順2: 最初のrを平均0, 分散W/N'の一様分布から選ぶ
+        step = ws[-1]/len(self.particles) # 正規化されていない場合はステップが「重みの合計W/パーティクル数N'」になる
+        r = np.random.uniform(0.0, step)
+
+        cur_pos = 0 # パーティクルのインデックス
+        ps  = [] # 新しいパーティクルのリスト
+
+        while(len(ps) < len(self.particles)):
+            if(r < ws[cur_pos]):
+                # 手順4i, ii: ポインタの指す要素の元となったパーティクルを新しいリストに追加し、rにstep(W/N')を足す
+                ps.append(self.particles[cur_pos])
+                r+=step
+            else:
+                # 手順3: 重みの累積値がrの所にポインタを進める
+                cur_pos += 1
+
+        # ps = random.choices(self.particles, weights=ws, k=len(self.particles))#wsの要素に比例した確率で、パーティクルをnum個選ぶ
         self.particles = [copy.deepcopy(e) for e in ps]
         for p in self.particles:
             p.weight = 1.0/len(self.particles) 
+    
+    # 2, 1, 5 -> 列
+    # 1, 1, 3 → 重み列
+    # 0.25 0.25, 0.5
+    # r \sim U[0,1] -> 0.7 -> 位置を調べるのにバイナリサーチ要る
+    # [0, 0.25] -> 1
+    # [0.25, 0.5] -> 2
+    # [0.5, 1.] -> 3
+
             
 class EstimationAgent(Agent):
     def __init__(self, time_interval, nu,omega,estimator):
