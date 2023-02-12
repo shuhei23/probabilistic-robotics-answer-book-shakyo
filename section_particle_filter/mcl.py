@@ -32,15 +32,24 @@ class Particle:
 
 
 class Mcl: # Monte Carlo Localization
-    def __init__(self,envmap,init_pose,num, motion_noise_stds={"nn":0.19, "no":0.001, "on":0.13, "oo": 0.2},distance_dev_rate=0.14,direction_dev=0.05):
+    def __init__(self,envmap, init_pose, num,\
+                motion_noise_stds={"nn":0.19, "no":0.001, "on":0.13, "oo": 0.2},\
+                distance_dev_rate=0.14,direction_dev=0.05):
         self.particles = [Particle(init_pose, 1.0/num) for i in range(num)]
         self.map = envmap
         self.distance_dev_rate = distance_dev_rate
         self.direction_dev = direction_dev
+        self.ml = self.particles[0] # maximum likelihood（最尤なパーティクル）
+        self.pose = self.ml.pose
 
         v = motion_noise_stds
         c = np.diag([v["nn"] ** 2, v["no"]**2, v["on"]**2, v["oo"]**2])
         self.motion_noise_rate_pdf = multivariate_normal(cov=c) # 多変数共分散行列covから乱数ジェネレータを作成
+
+    def set_ml(self):
+        i = np.argmax([p.weight for p in self.particles])
+        self.ml = self.particles[i]
+        self.pose = self.ml.pose
 
     def motion_update(self, nu, omega, time):
         for p in self.particles:
@@ -55,7 +64,8 @@ class Mcl: # Monte Carlo Localization
 
     def observation_update(self, observation):
         for p in self.particles:
-            p.observation_update(observation, self.map, self.distance_dev_rate, self.direction_dev)   
+            p.observation_update(observation, self.map, self.distance_dev_rate, self.direction_dev)
+        self.set_ml() 
         self.resampling()
     
     def resampling(self):
@@ -111,6 +121,9 @@ class EstimationAgent(Agent):
     
     def draw(self,ax,elems):
         self.estimator.draw(ax,elems)
+        x,y,t = self.estimator.pose
+        s = "({:.2f},{:.2f},{})".format(x,y,int(t*180/math.pi)%360)
+        elems.append(ax.text(x,y+0.1,s,fontsize=8))
 
 
 def trial():
