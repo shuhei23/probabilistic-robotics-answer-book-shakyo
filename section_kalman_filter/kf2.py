@@ -115,6 +115,16 @@ def trial():
     r = Robot(initial_pose, sensor=Camera(m), agent=circling, color="red")
     world.append(r)
     
+    kf = KalmanFilter(m, initial_pose)
+    linear = EstimationAgent(time_interval, 0.1, 0.0, kf)
+    r = Robot(initial_pose, sensor=Camera(m), agent=linear, color="red")
+    world.append(r)
+    
+    kf = KalmanFilter(m, initial_pose)
+    right = EstimationAgent(time_interval, 0.1, -3.0/180*math.pi, kf)
+    r = Robot(initial_pose, sensor=Camera(m), agent=right, color="red")
+    world.append(r)
+    
     world.draw()
 
 if __name__ == '__main__':
