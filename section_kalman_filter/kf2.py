@@ -3,6 +3,7 @@ sys.path.append('../scripts/')
 from mcl import *
 from scipy.stats import multivariate_normal
 from matplotlib.patches import Ellipse
+import time
 
 def sigma_ellipse(p, cov, n):
     # (x-x0)'*S*(x-x0) = 1 (正規化されてる)
@@ -29,15 +30,49 @@ def matF(nu, omega, time, theta):
     F[1,2] = nu/omega*(math.sin(theta+omega*time)-math.sin(theta))
     return F
 
+def matH(pose,landmark_pos):
+    mx, my = landmark_pos
+    mux, muy, mut, = pose # 観測データから更新する前の平均推定値
+    q = (mux-mx)**2 + (muy-my)**2 # 6.26式
+    return np.array([[(mux-mx)/np.sqrt(q), (muy-my)/np.sqrt(q), 0.],[(my-muy)/q, (mux-mx)/q, -1.]])
+
+def matQ(distance_dev, direction_dev):
+    # l(x)\sigma_l => distance_dev
+    # \sigma_\phi => direction_dev
+    return np.diag([distance_dev**2, direction_dev**2])
+
 class KalmanFilter:
-    def __init__(self, envmap, init_pose, motion_noise_stds={"nn":0.19, "no":0.001, "on":0.13, "oo":0.2}):
+    def __init__(self, envmap, init_pose, motion_noise_stds={"nn":0.19, "no":0.001, "on":0.13, "oo":0.2}, distance_dev_rate=0.14, direction_dev=0.03):
         self.belief = multivariate_normal(mean=np.array([0.0, 0.0, 0.0]), cov=np.diag([1e-10, 1e-10, 1e-10]))
-        self.motion_noise_stds = motion_noise_stds
         self.pose = self.belief.mean
-        print("KalmanFiler: mean = {0}".format(self.belief.mean))      
+        self.motion_noise_stds = motion_noise_stds
+        self.map = envmap
+        self.distance_dev_rate = distance_dev_rate
+        self.direction_dev = direction_dev
+        # print("KalmanFiler: mean = {0}".format(self.belief.mean))      
     
     def observation_update(self, observation):
-        pass
+        for d in observation:
+            z = d[0]
+            obs_id = d[1]
+
+            H = matH(self.belief.mean,self.map.landmarks[obs_id].pos) # \hat{b}_t = self.belief.mean, (m_x,m_y)_obs_id = self.map.landmarks[obs_id].pos
+            estimated_z = IdealCamera.observation_function(self.belief.mean,self.map.landmarks[obs_id].pos) # ランドマークとの相対距離
+            Q = matQ(estimated_z[0]*self.distance_dev_rate, self.direction_dev)
+            t_start = time.time()
+            for i in range(0,100):
+                K = self.belief.cov.dot(H.T).dot(np.linalg.inv(Q+H.dot(self.belief.cov).dot(H.T))) # \hat{\Sigma} = self.belief.cov
+            t_end = time.time()
+            print("observation_update: time_K = {0}".format(t_end-t_start))
+            t_start = time.time()
+            for i in range(0,100):
+                K_2 = self.belief.cov.dot(np.linalg.solve(Q+H.dot(self.belief.cov).dot(H.T),H).T)
+            t_end = time.time()
+            print("observation_update: time_K_2 = {0}".format(t_end-t_start))
+            print("observation_update: error_K_K2 = {0}".format(np.linalg.norm(K-K_2,'fro')))
+            self.belief.mean +=K.dot(z-estimated_z)
+            self.belief.cov = (np.eye(3) - K.dot(H)).dot(self.belief.cov)
+            self.pose = self.belief.mean
 
     def motion_update(self, nu, omega, time):
         if abs(omega) < 1e-5: 
