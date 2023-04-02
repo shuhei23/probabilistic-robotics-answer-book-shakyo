@@ -59,17 +59,17 @@ class KalmanFilter:
             H = matH(self.belief.mean,self.map.landmarks[obs_id].pos) # \hat{b}_t = self.belief.mean, (m_x,m_y)_obs_id = self.map.landmarks[obs_id].pos
             estimated_z = IdealCamera.observation_function(self.belief.mean,self.map.landmarks[obs_id].pos) # ランドマークとの相対距離
             Q = matQ(estimated_z[0]*self.distance_dev_rate, self.direction_dev)
-            t_start = time.time()
-            for i in range(0,100):
-                K = self.belief.cov.dot(H.T).dot(np.linalg.inv(Q+H.dot(self.belief.cov).dot(H.T))) # \hat{\Sigma} = self.belief.cov
-            t_end = time.time()
-            print("observation_update: time_K = {0}".format(t_end-t_start))
-            t_start = time.time()
-            for i in range(0,100):
-                K_2 = self.belief.cov.dot(np.linalg.solve(Q+H.dot(self.belief.cov).dot(H.T),H).T)
-            t_end = time.time()
-            print("observation_update: time_K_2 = {0}".format(t_end-t_start))
-            print("observation_update: error_K_K2 = {0}".format(np.linalg.norm(K-K_2,'fro')))
+            # t_start = time.time()
+            #for i in range(0,100):
+            K = self.belief.cov.dot(H.T).dot(np.linalg.inv(Q+H.dot(self.belief.cov).dot(H.T))) # \hat{\Sigma} = self.belief.cov
+            # t_end = time.time()
+            # print("observation_update: time_K = {0}".format(t_end-t_start))
+            # t_start = time.time()
+            # for i in range(0,100):
+            #    K_2 = self.belief.cov.dot(np.linalg.solve(Q+H.dot(self.belief.cov).dot(H.T),H).T)
+            # t_end = time.time()
+            # print("observation_update: time_K_2 = {0}".format(t_end-t_start))
+            # print("observation_update: error_K_K2 = {0}".format(np.linalg.norm(K-K_2,'fro')))
             self.belief.mean +=K.dot(z-estimated_z)
             self.belief.cov = (np.eye(3) - K.dot(H)).dot(self.belief.cov)
             self.pose = self.belief.mean
