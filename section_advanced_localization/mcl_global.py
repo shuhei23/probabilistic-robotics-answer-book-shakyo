@@ -30,3 +30,16 @@ def trial(animation):
     world.draw()
 
     return (r.pose, pf.pose) # 真の姿勢と推定姿勢を返す
+
+
+if __name__=='__main__':
+    ok = 0
+    for i in range(1000):
+        actual, estm = trial(False)
+        diff = math.sqrt((actual[0] - estm[1])**2 + (actual[1] - estm[1])**2 )
+        print(i, "真値:", actual, "推定値:", estm, "誤差:", diff)
+        if diff <= 1.0:
+            ok += 1
+
+    ok
+
