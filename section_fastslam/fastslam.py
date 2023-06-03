@@ -52,10 +52,11 @@ class MapParticle(Particle):
         Q = matQ(distance_dev_rate*estm_z[0],direcrion_dev)
         K = landmark.cov.dot(H.T).dot(np.linalg.inv(Q+H.dot(landmark.cov).dot(H.T))) # 式(8.38)
         
-        # 重みの更新 #
+        ## パーティクルの重み更新 ##
         Q_z = H.dot(landmark.cov).dot(H.T) + Q # 式(8.52)
         self.weight *= multivariate_normal(mean=estm_z, cov=Q_z).pdf(z) # 式(8.55)
 
+        # ランドマークの位置推定の更新
         landmark.pos = K.dot(z-estm_z) + landmark.pos # 式(8.39)
         landmark.cov = (np.eye(2)-K.dot(H)).dot(landmark.cov) # 式(8.40)
 
