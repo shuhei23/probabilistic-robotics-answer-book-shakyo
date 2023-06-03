@@ -51,6 +51,11 @@ class MapParticle(Particle):
         H = -matH(self.pose, landmark.pos)[0:2,0:2] # 式(8.33)
         Q = matQ(distance_dev_rate*estm_z[0],direcrion_dev)
         K = landmark.cov.dot(H.T).dot(np.linalg.inv(Q+H.dot(landmark.cov).dot(H.T))) # 式(8.38)
+        
+        # 重みの更新 #
+        Q_z = H.dot(landmark.cov).dot(H.T) + Q # 式(8.52)
+        self.weight *= multivariate_normal(mean=estm_z, cov=Q_z).pdf(z) # 式(8.55)
+
         landmark.pos = K.dot(z-estm_z) + landmark.pos # 式(8.39)
         landmark.cov = (np.eye(2)-K.dot(H)).dot(landmark.cov) # 式(8.40)
 
@@ -73,7 +78,7 @@ class FastSlam(Mcl):
 
 def trial():
     time_interval = 0.1
-    world = World(30,time_interval, debug=False)
+    world = World(60,time_interval, debug=False)
 
     ## 真の地図を作成 ##
     m = Map()
