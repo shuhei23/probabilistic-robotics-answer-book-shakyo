@@ -39,6 +39,7 @@ def matH(pose,landmark_pos):
 def matQ(distance_dev, direction_dev):
     # l(x)\sigma_l => distance_dev
     # \sigma_\phi => direction_dev
+    # 後で \sigma_l => distance_dev_rate として導入されている
     return np.diag([distance_dev**2, direction_dev**2])
 
 class KalmanFilter:
