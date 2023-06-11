@@ -116,7 +116,7 @@ class FastSlam(Mcl):
         
         if len(not_first_obs) > 0:
             for p in self.particles:
-                p.motion_update2(nu, omega, time, self.motion_noise_stds, not_first_obs, self.direction_dev_rate, self.direction_dev)
+                p.motion_update2(nu, omega, time, self.motion_noise_stds, not_first_obs, self.distance_dev_rate, self.direction_dev)
 
         else:
             for p in self.particles:
@@ -157,7 +157,7 @@ def trial():
     ### ロボットを作る
     initial_pose = np.array([0,0,0]).T
     estimator = FastSlam(initial_pose,100, len(m.landmarks))
-    circling = EstimationAgent(time_interval, 0.2, 10.0/180*math.pi,estimator)
+    circling = FastSlam2Agent(time_interval, 0.2, 10.0/180*math.pi,estimator)
     r = Robot(initial_pose, sensor=Camera(m), agent=circling, color="red")
     world.append(r)
     
