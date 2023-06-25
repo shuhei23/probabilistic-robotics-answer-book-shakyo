@@ -1,4 +1,5 @@
 import sys
+import itertools
 sys.path.append('../scripts/')
 from kf import * #誤差楕円を描くのに利用
 
@@ -28,10 +29,15 @@ def draw_observations(xs, zlist, ax): #センサ値の描画
             mx = x + ell*math.cos(theta+phi)
             my = y + ell*math.sin(theta+phi)
             ax.plot([x,mx], [y,my], color="pink", alpha=0.5)
-        
-def draw(xs, zlist):
+
+def draw_edges(edges, ax):
+    for e in edges:
+        ax.plot([e.x1[0], e.x2[0]], [e.x1[1], e.x2[1]], color="red", alpha=0.5)
+
+def draw(xs, zlist, edges):
     ax = make_ax()
     draw_observations(xs, zlist, ax)
+    draw_edges(edges,ax)
     draw_trajectory(xs, ax)
     plt.show()
 
@@ -55,6 +61,35 @@ def read_data(): #データの読み込み
                 zlist[step].append((int(tmp[2]), np.array([float(tmp[3]), float(tmp[4]), float(tmp[5])]).T))
     return hat_xs, zlist
 
-hat_xs, zlist = read_data()
-draw(hat_xs, zlist)
 
+class ObsEdge:
+    def __init__(self, t1 , t2, z1, z2, xs) :
+        assert z1[0] == z2[0] # ランドマークのIDが違ったら処理を止める
+        
+        self.t1, self.t2 = t1, t2           # 時刻の記録
+        self.x1, self.x2 = xs[t1], xs[t2]   # 各時刻の姿勢
+        self.z1, self.z2 = z1[1], z2[1]     # 各時刻のセンサ値
+
+
+def make_edges(hat_xs, zlist):
+    landmark_key_zlist = {} # ランドマークのIDをキーにして観測された時刻とセンサ値を記録
+
+    for step in zlist:      # キーを時刻からランドマークのIDへ
+        for z in zlist[step]:
+            landmark_id = z[0]
+            if landmark_id not in landmark_key_zlist:
+                landmark_key_zlist[landmark_id] = []
+
+            landmark_key_zlist[landmark_id].append((step,z)) #タプルを追加
+
+    edges = []
+    for landmark_id in landmark_key_zlist:
+        step_pairs = list(itertools.combinations(landmark_key_zlist[landmark_id],2)) # 時刻のペアを作成
+        # ランドマークが　j = landmark_id のとき， z_{j,1}, z_{j,5}, z_{j,8} -> 1-5, 1-8, 5-8 全部の組を使うらしい
+        edges += [ObsEdge(xz1[0], xz2[0], xz1[1], xz2[1], hat_xs) for xz1, xz2 in step_pairs]
+
+    return edges
+
+hat_xs, zlist = read_data()
+edges = make_edges(hat_xs, zlist)
+draw(hat_xs,zlist,edges)
