@@ -64,11 +64,34 @@ def read_data(): #データの読み込み
 
 class ObsEdge:
     def __init__(self, t1 , t2, z1, z2, xs) :
+        # xs = [step, (x, y, z)]
+        # z1 = [id, (ell, phi, psi)]
         assert z1[0] == z2[0] # ランドマークのIDが違ったら処理を止める
         
         self.t1, self.t2 = t1, t2           # 時刻の記録
-        self.x1, self.x2 = xs[t1], xs[t2]   # 各時刻の姿勢
-        self.z1, self.z2 = z1[1], z2[1]     # 各時刻のセンサ値
+        self.x1, self.x2 = xs[t1], xs[t2]   # 各時刻の姿勢 slef.x = [x,y,theta]
+        self.z1, self.z2 = z1[1], z2[1]     # 各時刻のセンサ値 self.z = [ell, phi, psi]
+
+        s1 = math.sin(self.x1[2] + self.z1[1]) # sin(theta_1 + phi_1)
+        c1 = math.cos(self.x1[2] + self.z1[1]) 
+        s2 = math.sin(self.x2[2] + self.z2[1])
+        c2 = math.cos(self.x2[2] + self.z2[1])
+
+        ### 誤差の計算 ###
+        hat_e = self.x2 - self.x1 + np.array([
+            self.z2[0]*c2 - self.z1[0]*c1, 
+            self.z2[0]*s2 - self.z1[0]*s1, 
+            self.z2[1]- self.z2[2] - self.z1[1] + self.z1[2] ])
+        
+        # -pi <= hat_e[2] < +pi になるように2*pi=360度を足し引き
+        while hat_e[2] >= math.pi: hat_e -= math.pi*2
+        while hat_e[2] < -math.pi: hat_e += math.pi*2
+        
+        print(hat_e)
+        ## 精度行列の作成 ##
+        # Q1 = np.diag([(self.z1[0] * sensor_noise_rate)])
+
+
 
 
 def make_edges(hat_xs, zlist):
