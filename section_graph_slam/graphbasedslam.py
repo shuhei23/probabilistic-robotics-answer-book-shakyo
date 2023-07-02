@@ -63,7 +63,7 @@ def read_data(): #データの読み込み
 
 
 class ObsEdge:
-    def __init__(self, t1 , t2, z1, z2, xs) :
+    def __init__(self, t1 , t2, z1, z2, xs, sensor_noise_rate=[0.14,0.05,0.05]): # sensor_noise_rate追加 
         # xs = [step, (x, y, z)]
         # z1 = [id, (ell, phi, psi)]
         assert z1[0] == z2[0] # ランドマークのIDが違ったら処理を止める
@@ -89,8 +89,25 @@ class ObsEdge:
         
         print(hat_e)
         ## 精度行列の作成 ##
-        # Q1 = np.diag([(self.z1[0] * sensor_noise_rate)])
+        # y = Ax + Bz のとき，分散共分散行列は A@Sigma_A@A' + B@Sigma_B@B'
+        # e_{j,t_1,t_2} = (線形近似) = R_{j,t_1}@z_{j_a} + R_{j,t_2}z_{j_b}
+        # となるので，e_{j,t_1,t_2}の分散共分散行列は
+        # R_{j,t_1}@Q_{j,t_1}@R_{j,t_1}' + R_{j,t_2}@Q_{j,t_2}@R_{j,t_2}'
 
+        Q1 = np.diag([(self.z1[0] * sensor_noise_rate[0])**2, sensor_noise_rate[1]**2,sensor_noise_rate[2]**2]) # 式(9.29)
+        R1 = -np.array([[c1, -self.z1[0]*s1, 0],
+                        [s1,  self.z1[0]*c1, 0], 
+                        [0,   1,             -1]]) # 式(9.31)
+
+        Q2 = np.diag([(self.z2[0] * sensor_noise_rate[0])**2, sensor_noise_rate[1]**2,sensor_noise_rate[2]**2])
+        R2 = -np.array([[c2, -self.z2[0]*s2, 0],
+                        [s2,  self.z2[0]*c2, 0], 
+                        [0,   1,             -1]]) # 式(9.32)
+        
+        Sigma = R1.dot(Q1).dot(R1.T) + R2.dot(Q2).dot(R2.T) # 式(9.34)
+        self.Omega = np.linalg.inv(Sigma)
+
+        print(Sigma)
 
 def make_edges(hat_xs, zlist):
     landmark_key_zlist = {} # ランドマークのIDをキーにして観測された時刻とセンサ値を記録
