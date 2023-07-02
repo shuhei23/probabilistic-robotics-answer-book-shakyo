@@ -92,8 +92,6 @@ class ObsEdge:
         # Q1 = np.diag([(self.z1[0] * sensor_noise_rate)])
 
 
-
-
 def make_edges(hat_xs, zlist):
     landmark_key_zlist = {} # ランドマークのIDをキーにして観測された時刻とセンサ値を記録
 
@@ -108,7 +106,7 @@ def make_edges(hat_xs, zlist):
     edges = []
     for landmark_id in landmark_key_zlist:
         step_pairs = list(itertools.combinations(landmark_key_zlist[landmark_id],2)) # 時刻のペアを作成
-        # ランドマークが　j = landmark_id のとき， z_{j,1}, z_{j,5}, z_{j,8} -> 1-5, 1-8, 5-8 全部の組を使うらしい
+        # ランドマークが j = landmark_id のとき， z_{j,1}, z_{j,5}, z_{j,8} -> 1-5, 1-8, 5-8 全部の組を使うらしい
         edges += [ObsEdge(xz1[0], xz2[0], xz1[1], xz2[1], hat_xs) for xz1, xz2 in step_pairs]
 
     return edges
