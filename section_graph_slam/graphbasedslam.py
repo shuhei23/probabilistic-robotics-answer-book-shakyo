@@ -29,7 +29,7 @@ class ObsEdge:
         while hat_e[2] >= math.pi: hat_e -= math.pi*2
         while hat_e[2] < -math.pi: hat_e += math.pi*2
         
-        print(hat_e)
+        # print(hat_e)
         ## 精度行列の作成 ##
         # y = Ax + Bz のとき，分散共分散行列は A@Sigma_A@A' + B@Sigma_B@B'
         # e_{j,t_1,t_2} = (線形近似) = R_{j,t_1}@z_{j_a} + R_{j,t_2}z_{j_b}
@@ -66,6 +66,35 @@ class ObsEdge:
         # 式(9.44)
         self.xi_upper = - B1.T.dot(Omega).dot(hat_e)
         self.xi_bottom = -B2.T.dot(Omega).dot(hat_e)
+
+
+class MotionEdge: 
+    def __init__(self, t1 , t2, xs, us, delta, motion_noise_stds={"nn":0.19, "no":0.001, "on": 0.13, "oo":0.2}):
+        # xs = [step, (x, y, z)] が　並んでいる
+        # us = [step, (nu, omega)] が　並んでいる
+        self.t1, self.t2 = t1, t2           # 時刻の記録
+        self.hat_x1, self.hat_x2 = xs[t1], xs[t2] # 各時刻の姿勢
+
+        nu, omega = us[t2]
+        if abs(omega) < 1e-5: omega = 1e-5 # ゼロにすると式が変わるので避ける
+
+        M = matM(nu, omega, delta, motion_noise_stds) # 式(9.52)
+        A = matA(nu, omega, delta, self.hat_x1[2])    # 式(9.54)
+        F = matF(nu, omega, delta, self.hat_x1[2])    # 式(9.58)
+
+        self.Omega = np.linalg.inv(A.dot(M).dot(A.T)+ np.eye(3)*0.0001) # 標準偏差0.01の雑音を足す
+
+        # 式(9.59)
+        self.omega_upperleft  = F.T.dot(self.Omega).dot(F)
+        self.omega_upperright = -F.T.dot(self.Omega)
+        self.omega_bottomleft = -self.Omega.dot(F)
+        self.omega_bottomright = self.Omega
+        
+        # 式(9.60)
+        x2 = IdealRobot.state_transition(nu, omega, delta, self.hat_x1)
+        self.xi_upper = F.T.dot(self.Omega).dot(self.hat_x2 - x2)
+        self.xi_bottom = -self.Omega.dot(self.hat_x2-x2)
+      
 
 ### Method ###
 def make_ax(): #axisの準備
@@ -109,8 +138,10 @@ def Draw(xs, zlist, edges):
 def ReadData(): #データの読み込み
     hat_xs={} #軌跡のデータ(ステップ数をキーにして姿勢を保存)
     zlist={} #センサ値のデータ(ステップ数をキーにして、さらにその中にランドマークのIDとセンサ値をタプルで保存)
+    delta = 0.0
+    us = {} 
     
-    with open("log.txt") as f:
+    with open("log_movement_edge.txt") as f:
         # log.txt format は2パターン
         # "x", step, x, y, theta
         # "z", step, id, x, y, theta
@@ -124,7 +155,11 @@ def ReadData(): #データの読み込み
                 if step not in zlist: #ランドマークを発見していない時は空を入れておく
                     zlist[step] = []
                 zlist[step].append((int(tmp[2]), np.array([float(tmp[3]), float(tmp[4]), float(tmp[5])]).T))
-    return hat_xs, zlist
+            elif tmp[0] == "delta": # 以下の読み込みを追加
+                delta = float(tmp[1]) # = \Delta t (データをとる間隔)
+            elif tmp[0] == "u":
+                us[step] = np.array([float(tmp[2]),float(tmp[3])]).T # nu, omega
+    return hat_xs, zlist, us, delta 
 
 def AddEdge(edge,Omega,xi):
     f1, f2 = edge.t1*3, edge.t2*3
@@ -157,12 +192,16 @@ def MakeEdges(hat_xs, zlist):
 
 
 if __name__ == '__main__':
-    hat_xs, zlist = ReadData()
+    hat_xs, zlist, us, delta = ReadData()
     dim = len(hat_xs)*3 # 軌跡をつなげたベクトルの次元
-    
-    for n in range(1, 10000): # 繰り返しの回数は適当に大きい値
+    loop_num = 10000
+    for n in range(1, loop_num): # 繰り返しの回数は適当に大きい値
         ### エッジ、大きな精度行列、係数ベクトルの作成
         edges = MakeEdges(hat_xs, zlist)
+
+        for i in range(len(hat_xs)-1): # 移動エッジの追加
+            edges.append(MotionEdge(i, i+1, hat_xs, us, delta))
+
         Omega = np.zeros((dim, dim))
         xi = np.zeros(dim)
         Omega[0:3,0:3] += np.eye(3)*1000000 # x0の固定
@@ -180,6 +219,6 @@ if __name__ == '__main__':
         # 終了判定
         diff = np.linalg.norm(delta_xs)
         print("{}回目の繰り返し:{}".format(n,diff))
-        if diff < 0.01:
+        if diff < 0.01 or  n == loop_num - 1:
             Draw(hat_xs,zlist,edges)
             break

@@ -22,23 +22,27 @@ class PsiCamera(Camera):
 
 class LoggerAgent(Agent):
     def __init__(self,nu,omega,interval_time,init_pose):
-        super().__init__(nu,omega)
+        super().__init__(nu,omega) # nu, omega
         self.interval_time = interval_time
         self.pose = init_pose
         self.step = 0
-        self.log = open("log.txt","w")
+        self.log = open("log_movement_edge.txt","w")
+        self.log.write("delta {}\n". format(interval_time)) # \Delta t の記録
     
     def decision(self, observation):
-        if len(observation) != 0:
-            self.log.write("x {} {} {} {}\n".format(self.step,*self.pose)) # 時刻，x, y, theta
-            for obs in observation:
-                self.log.write("z {} {} {} {} {}\n".format(self.step,obs[1],*obs[0]))
-            
-            self.step += 1
-            self.log.flush()
+        self.log.write("u {} {} {}\n".format(self.step, self.nu, self.omega)) # u = (nu, omega) = (速度, 角速度)
+        self.log.write("x {} {} {} {}\n".format(self.step,*self.pose)) # 時刻，x, y, theta
+
+        for obs in observation:
+            self.log.write("z {} {} {} {} {}\n".format(self.step,obs[1],*obs[0]))
+        
+        self.step += 1
+        self.log.flush()
         
         self.pose = IdealRobot.state_transition(self.nu, self.omega, self.interval_time, self.pose)
         return self.nu, self.omega
+
+        # \varDelta @ \Omega^* @ \varDelta - 2 * \xi^* @ \varDelta x
     
 if __name__ == '__main__':
     time_interval = 3
