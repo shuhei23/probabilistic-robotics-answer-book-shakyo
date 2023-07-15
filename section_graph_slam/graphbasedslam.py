@@ -23,11 +23,11 @@ class ObsEdge:
         hat_e = self.x2 - self.x1 + np.array([
             self.z2[0]*c2 - self.z1[0]*c1, 
             self.z2[0]*s2 - self.z1[0]*s1, 
-            self.z2[1]- self.z2[2] - self.z1[1] + self.z1[2] ])
+            self.z2[1]- self.z2[2] - self.z1[1] + self.z1[2] ]) # 式(9.27)
         
         # -pi <= hat_e[2] < +pi になるように2*pi=360度を足し引き
-        while hat_e[2] >= math.pi: hat_e -= math.pi*2
-        while hat_e[2] < -math.pi: hat_e += math.pi*2
+        while hat_e[2] >= math.pi: hat_e[2] -= math.pi*2
+        while hat_e[2] < -math.pi: hat_e[2] += math.pi*2
         
         # print(hat_e)
         ## 精度行列の作成 ##
@@ -70,8 +70,8 @@ class ObsEdge:
 
 class MotionEdge: 
     def __init__(self, t1 , t2, xs, us, delta, motion_noise_stds={"nn":0.19, "no":0.001, "on": 0.13, "oo":0.2}):
-        # xs = [step, (x, y, z)] が　並んでいる
-        # us = [step, (nu, omega)] が　並んでいる
+        # xs = [step, (x, y, z)] が並んでいる
+        # us = [step, (nu, omega)] が並んでいる
         self.t1, self.t2 = t1, t2           # 時刻の記録
         self.hat_x1, self.hat_x2 = xs[t1], xs[t2] # 各時刻の姿勢
 
@@ -95,6 +95,21 @@ class MotionEdge:
         self.xi_upper = F.T.dot(self.Omega).dot(self.hat_x2 - x2)
         self.xi_bottom = -self.Omega.dot(self.hat_x2-x2)
       
+class MapEdge:
+    def __init__(self, t, z, head_t, head_z, xs): # head_tとhead_zは最初に対象のランドマークを観測したときの時刻とセンサ値
+        self.x = xs[t]
+        self.z = z
+        # ランドマークの位置と向き 式(9.62)
+        self.m = self.x + np.array([
+            z[0] * math.cos(self.x[2] + z[1]),
+            z[0] * math.sin(self.x[2] + z[1]),
+            -xs[head_t][2]+z[1] - head_z[1] - z[2] + head_z[2]
+        ]).T
+        while self.m[2] >= math.pi:
+            self.m[2] -= math.pi*2
+        while self.m[2] < -math.pi:
+            self.m[2] += math.pi*2
+        
 
 ### Method ###
 def make_ax(): #axisの準備
@@ -127,21 +142,26 @@ def draw_observations(xs, zlist, ax): #センサ値の描画
 def draw_edges(edges, ax):
     for e in edges:
         ax.plot([e.x1[0], e.x2[0]], [e.x1[1], e.x2[1]], color="red", alpha=0.5)
+        
+def draw_landmarks(ms, ax):
+    ax.scatter([ms[k][0] for k in ms], [ms[k][1] for k in ms], s=100, marker="*", color="blue", zorder=100)
+    # ax.scatter([m[0] for m in ms], [m[1] for m in ms], s=100, marker="*", color="blue", zorder=100)
 
-def Draw(xs, zlist, edges):
+def Draw(xs, zlist, edges, ms=[]):
     ax = make_ax()
     draw_observations(xs, zlist, ax)
     # draw_edges(edges,ax)
     draw_trajectory(xs, ax)
+    draw_landmarks(ms, ax)
     plt.show()
 
-def ReadData(): #データの読み込み
+def ReadData(filename): #データの読み込み
     hat_xs={} #軌跡のデータ(ステップ数をキーにして姿勢を保存)
     zlist={} #センサ値のデータ(ステップ数をキーにして、さらにその中にランドマークのIDとセンサ値をタプルで保存)
     delta = 0.0
     us = {} 
     
-    with open("log_movement_edge.txt") as f:
+    with open(filename) as f:
         # log.txt format は2パターン
         # "x", step, x, y, theta
         # "z", step, id, x, y, theta
@@ -188,16 +208,19 @@ def MakeEdges(hat_xs, zlist):
         # ランドマークが j = landmark_id のとき， z_{j,1}, z_{j,5}, z_{j,8} -> 1-5, 1-8, 5-8 全部の組を使うらしい
         edges += [ObsEdge(xz1[0], xz2[0], xz1[1], xz2[1], hat_xs) for xz1, xz2 in step_pairs]
 
-    return edges
+    return edges, landmark_key_zlist
 
 
 if __name__ == '__main__':
-    hat_xs, zlist, us, delta = ReadData()
+    
+    filename = "log_ref.txt"
+    loop_num = 100
+    
+    hat_xs, zlist, us, delta = ReadData(filename)
     dim = len(hat_xs)*3 # 軌跡をつなげたベクトルの次元
-    loop_num = 10000
     for n in range(1, loop_num): # 繰り返しの回数は適当に大きい値
         ### エッジ、大きな精度行列、係数ベクトルの作成
-        edges = MakeEdges(hat_xs, zlist)
+        edges,_ = MakeEdges(hat_xs, zlist)
 
         for i in range(len(hat_xs)-1): # 移動エッジの追加
             edges.append(MotionEdge(i, i+1, hat_xs, us, delta))
@@ -222,3 +245,14 @@ if __name__ == '__main__':
         if diff < 0.01 or  n == loop_num - 1:
             Draw(hat_xs,zlist,edges)
             break
+    _, zlist_landmark = MakeEdges(hat_xs, zlist)
+    
+    ms = {}
+    for landmark_id in zlist_landmark:
+        edges = []
+        head_z = zlist_landmark[landmark_id][0] #最初の観測(ランドマークの向きのθの計算に利用)
+        for z in zlist_landmark[landmark_id]:
+            edges.append(MapEdge(z[0], z[1][1], head_z[0], head_z[1][1], hat_xs))
+            
+        ms[landmark_id] = np.mean([e.m for e in edges], axis=0)
+    Draw(hat_xs, zlist, edges, ms)
