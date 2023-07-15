@@ -96,7 +96,7 @@ class MotionEdge:
         self.xi_bottom = -self.Omega.dot(self.hat_x2-x2)
       
 class MapEdge:
-    def __init__(self, t, z, head_t, head_z, xs): # head_tとhead_zは最初に対象のランドマークを観測したときの時刻とセンサ値
+    def __init__(self, t, z, head_t, head_z, xs, sensor_noise_rate = [0.14,0.05,0.05]): # head_tとhead_zは最初に対象のランドマークを観測したときの時刻とセンサ値
         self.x = xs[t]
         self.z = z
         # ランドマークの位置と向き 式(9.62)
@@ -109,6 +109,18 @@ class MapEdge:
             self.m[2] -= math.pi*2
         while self.m[2] < -math.pi:
             self.m[2] += math.pi*2
+
+        ## 精度行列の計算
+        Q1 = np.diag([(self.z[0]*sensor_noise_rate[0])**2, sensor_noise_rate[1]**2, sensor_noise_rate[2]**2])
+
+        s1 = math.sin(self.x[2] + self.z[1])
+        c1 = math.cos(self.x[2] + self.z[1])
+        R = np.array([[-c1,  self.z[0]*s1, 0],
+                      [-s1, -self.z[0]*s1, 0],
+                      [  0,            -1, 1]])
+        
+        self.Omega = np.linalg.inv(R.dot(Q1).dot(R.T))
+        self.xi = self.Omega.dot(self.m)
         
 
 ### Method ###
@@ -253,6 +265,14 @@ if __name__ == '__main__':
         head_z = zlist_landmark[landmark_id][0] #最初の観測(ランドマークの向きのθの計算に利用)
         for z in zlist_landmark[landmark_id]:
             edges.append(MapEdge(z[0], z[1][1], head_z[0], head_z[1][1], hat_xs))
-            
-        ms[landmark_id] = np.mean([e.m for e in edges], axis=0)
+
+        Omega = np.zeros((3,3))
+        xi = np.zeros(3)
+        for e in edges:
+            Omega += e.Omega
+            xi += e.xi
+
+        ms[landmark_id] = np.linalg.inv(Omega).dot(xi)
+    
     Draw(hat_xs, zlist, edges, ms)
+     
