@@ -42,7 +42,7 @@ class ObsEdge:
                         [0,   1,             -1]]) # 式(9.31)
 
         Q2 = np.diag([(self.z2[0] * sensor_noise_rate[0])**2, sensor_noise_rate[1]**2,sensor_noise_rate[2]**2])
-        R2 = -np.array([[c2, -self.z2[0]*s2, 0],
+        R2 = np.array([[c2, -self.z2[0]*s2, 0],
                         [s2,  self.z2[0]*c2, 0], 
                         [0,   1,             -1]]) # 式(9.32)
         
