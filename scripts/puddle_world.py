@@ -93,11 +93,11 @@ class PuddleIgnoreAgent(EstimationAgent):
 
         # 以下制御ロジック
         if direction > 10: 
-            nu, omega = 0.0, 2.0
+            nu, omega = 0.0, 2.0 # 左回転
         elif direction < -10:
-            nu, omega = 0.0, -2.0
+            nu, omega = 0.0, -2.0 # 右回転
         else:
-            nu, omega = 1.0, 0.0
+            nu, omega = 1.0, 0.0 # 前進
         
         return nu, omega
     
