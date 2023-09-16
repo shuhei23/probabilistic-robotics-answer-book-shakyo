@@ -4,7 +4,7 @@ from puddle_world import *
 import itertools
 import collections
 
-class PolicyEvaluator:
+class DynamicProgramming:
     def __init__(self, widths, goal, puddles, 
                     time_interval, sampling_num, 
                     puddle_coef=100.0 ,lowerleft=np.array([-4,-4]).T, upperright=np.array([4,4]).T):
@@ -27,6 +27,24 @@ class PolicyEvaluator:
         
         self.time_interval = time_interval
         self.puddle_coef = puddle_coef
+
+    def value_iteration_sweep(self):
+        max_delta = 0.0
+        for index in self.indexes:
+            if not self.final_state_flags[index]:
+                max_q = -1e100
+                max_a = None
+                qs = [self.action_value(a, index) for a in self.actions] # 全行動の行動価値を計算，(状態)行動価値関数
+                max_q = max(qs) # 最大の行動価値
+                max_a = self.actions[np.argmax(qs)] # 最大の行動価値を与える行動
+
+                delta = abs(self.value_function[index] - max_q) # 状態価値関数の変化量
+                max_delta = delta if delta > max_delta else max_delta
+
+                self.value_function[index] = max_q # 価値の更新
+                self.policy[index] = np.array(max_a).T
+    
+        return max_delta
         
     def policy_evalutation_sweep(self):
         max_delta = 0.0
@@ -42,19 +60,30 @@ class PolicyEvaluator:
         
         return max_delta
     
-    def action_value(self, action, index):
+    def action_value(self, action, index, out_penalty = True):
         value = 0.0
         for delta, prob in self.state_transition_probs[(action, index[2])]: # index[2]:方角のインデックス, action = s' = 移動先のマスのインデックス
-            after = tuple(self.out_correction(np.array(index).T + delta)) #indexに差分deltaを足してはみ出し処理の後にタプル
-            reward = - self.time_interval * self.depths[(after[0], after[1])] * self.puddle_coef - self.time_interval # 最後の　- self.time_interval は移動にかかった時間の計算
+            # after = tuple(self.out_correction(np.array(index).T + delta)) #indexに差分deltaを足してはみ出し処理の後にタプル
+            after, out_reward = self.out_correction(np.array(index).T + delta)
+            after = tuple(after)
+            reward = - self.time_interval * self.depths[(after[0], after[1])] * self.puddle_coef - self.time_interval + out_reward * out_penalty# 最後の　- self.time_interval は移動にかかった時間の計算
             value += (self.value_function[after] + reward) * prob
         
         return value
 
     def out_correction(self, index):
+        out_reward = 0.0
         index[2] = (index[2] + self.index_nums[2]) % self.index_nums[2] #方角の処理
-        
-        return index
+
+        for i in range(2):
+            if index[i] < 0:
+                index[i] = 0
+                out_reward = -1e100
+            elif index[i] >= self.index_nums[i]:
+                index[i] = self.index_nums[i] - 1
+                out_reward = -1e100
+
+        return index, out_reward
             
     def init_state_transition_probs(self, time_interval, sampling_num):
         ### セルの中の座標を均等に(sampling_num**3)点サンプリング
@@ -136,77 +165,24 @@ class PolicyEvaluator:
 
         return tmp
 
-def trial():
-    # 10.3.2 最後以外はこれ
-    # pe = PolicyEvaluator(np.array([0.2, 0.2, math.pi/18]).T, Goal(-3, -3),0.1,10) # PolicyEvaluatorのオブジェクトを生成
-    
+def trial():    
     import seaborn as sns
     
     ### 10.3.3 
     puddles = [Puddle((-2,0),(0,2),0.1),Puddle((-0.5,-2),(2.5,1),0.1)]
-    pe = PolicyEvaluator(np.array([0.2, 0.2, math.pi/18]).T, Goal(-3, -3),puddles,0.1,10)
+    dp = DynamicProgramming(np.array([0.2, 0.2, math.pi/18]).T, Goal(-3, -3),puddles,0.1,10)
     counter = 0 #スイープの回数
   
-    # for i in range(50):
-    #     pe.policy_evalutation_sweep()
-    #     counter+=1
-
-    ### 10.3.4
     delta = 1e100
 
-    while delta > 0.01:
-        delta = pe.policy_evalutation_sweep()
+    # while delta > 0.01:
+    for i in range(10):
+        delta = dp.value_iteration_sweep()
         counter += 1
         print(counter, delta)
-        
-    v = pe.value_function[:, :, 18]
-    sns.heatmap(np.rot90(v), square=False)
-    plt.show()
-    print(counter)    
+          
 
-    ### 10.3.2 最後 ### 
-    # puddles = [Puddle((-2,0),(0,2),0.1),Puddle((-0.5,-2),(2.5,1),0.1)]
-    # pe = PolicyEvaluator(np.array([0.2, 0.2, math.pi/18]).T, Goal(-3, -3),puddles,0.1,10) # PolicyEvaluatorのオブジェクトを生成
-    # sns.heatmap(np.rot90(pe.depths),square=False)
-    # plt.show()
 
-    ### 10.3.2 後半 ###
-    # print(pe.state_transition_probs)
-    # ((0.0, -2.0), 0): [(array([ 0,  0, -2]), 0.2), (array([ 0,  0, -1]), 0.8)]
-    # u(0), u(1) = (0.0, -2.0), theta を 0 度ずらすとき，
-    # インデクスの相対変化が array([ 0,  0, -2]) となる確率 0.2
-    #                  array([ 0,  0, -1]) となる確率 0.8
-
-    ### 10.3.2 ###
-    # p = np.zeros(pe.index_nums)
-    # for i in pe.indexes:
-    #     p[i] = sum(pe.policy[i]) # 0.2(オレンジ色):直進、0.5(黒色):左回転、-0.5(クリーム色):右回転
-    
-    # sns.heatmap(np.rot90(p[:, :, 18]), square=False) #180~190degの向きの時の行動を図示
-    # plt.show()
-
-    ### 10.3.1 ###
-    # v = pe.value_function[:,:,0]
-    # sns.heatmap(np.rot90(v), square=False)
-    # plt.show()
-
-    # f = pe.final_state_flags[:,:,0]
-    # sns.heatmap(np.rot90(f), square=False)
-    # plt.show()
-    
-    # print(pe.index_nums)
-    
-    # 例題: policy_ evaluation1.ipynb-[4]
-    # print(np.floor((pose-pe.pose_min)/pe.widths).astype(int))
-    
-    # pose = np.array([2.9,-2,math.pi]).T
-    # print(np.floor((pose-pe.pose_min)/pe.widths).astype(int))
-    
-    # pose = np.array([-5,-2,math.pi/6]).T
-    # print(np.floor((pose-pe.pose_min)/pe.widths).astype(int))
-    
-    
-    
 
 if __name__ == '__main__':
     trial()
