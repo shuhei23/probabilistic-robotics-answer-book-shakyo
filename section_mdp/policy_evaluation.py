@@ -164,6 +164,16 @@ def trial():
     plt.show()
     print(counter)    
 
+    ### 11.1.2 ###
+    with open("puddle_ignore_policy.txt", "w") as f:
+        for index in pe.indexes:
+            p = pe.policy[index]
+            f.write("{} {} {} {} {}\n".format(index[0], index[1], index[2], p[0], p[1]))
+
+    with open("puddle_ignore_values.txt", "w") as f:
+        for index in pe.indexes:
+            p = pe.value_function[index]
+            f.write("{} {} {} {}\n".format(index[0], index[1], index[2], p))
     ### 10.3.2 最後 ### 
     # puddles = [Puddle((-2,0),(0,2),0.1),Puddle((-0.5,-2),(2.5,1),0.1)]
     # pe = PolicyEvaluator(np.array([0.2, 0.2, math.pi/18]).T, Goal(-3, -3),puddles,0.1,10) # PolicyEvaluatorのオブジェクトを生成
