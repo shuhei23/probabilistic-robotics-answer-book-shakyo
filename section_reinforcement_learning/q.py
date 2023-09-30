@@ -3,6 +3,7 @@ import sys
 sys.path.append("../scripts/")
 from puddle_world import math, np
 from dp_policy_agent import *
+import random, copy  # copyを追加
 
 
 class QAgent(DpPolicyAgent):
@@ -60,6 +61,7 @@ class QAgent(DpPolicyAgent):
         if self.update_end:
             return 0.0, 0.0
         if self.in_goal:
+            # print("update_end")
             self.update_end = True  # ゴールに入った後も一回だけ更新があるので即終了はしない
 
         ### カルマンフィルタの実行 ###
@@ -96,14 +98,52 @@ class QAgent(DpPolicyAgent):
         self.ss[s].q[a] = (1.0 - self.alpha) * q + self.alpha * (r + q_)
 
         # ログを取る
-        with open("log.txt", "a") as f:
-            f.write(
-                f"s:{s} r:{r} s:{s_} prev_q:{q:.2f}, next_step_max_q:{q_:.2f}, new_q:{self.ss[s].q[a]:.2f}\n"
-            )
-            # 教科書の実装(後々このlog.txt利用時は下記を参照)
-            # f.write(
-            #     f"{s} {r} {s_} prev_q:{q:.2f}, next_step_max_q:{q_:.2f}, new_q:{self.ss[s].q[a]:.2f}\n"
-            # )
+        # with open("log.txt", "a") as f:
+        #     f.write(
+        #         f"s:{s} r:{r} s:{s_} prev_q:{q:.2f}, next_step_max_q:{q_:.2f}, new_q:{self.ss[s].q[a]:.2f}\n"
+        #     )
+        # 教科書の実装(後々このlog.txt利用時は下記を参照)
+        # f.write(
+        #     f"{s} {r} {s_} prev_q:{q:.2f}, next_step_max_q:{q_:.2f}, new_q:{self.ss[s].q[a]:.2f}\n"
+        # )
+
+
+class WarpRobot(Robot):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.init_agent = copy.deepcopy(self.agent)  # エージェントの深いコピーを残しておく
+
+    def choose_pose(self):  # 初期位置をランダムに決めるメソッド
+        xy = random.random() * 6 - 2  # -2 から +4 ???
+        t = random.random() * 2 * math.pi  # 0 から 2pi
+        if random.random() > 0.5:  # 確率 1/2
+            return np.array([3, xy, t]).T
+        else:
+            return np.array([xy, 3, t]).T
+
+    def reset(self):
+        ## ssだけ残してエージェントを初期化
+        tmp = self.agent.ss  # state space
+        self.agent = copy.deepcopy(self.init_agent)
+        self.agent.ss = tmp
+
+        # 初期位置をセット(ロボット，カルマンフィルタ)
+        self.pose = self.choose_pose()
+        self.agent.estimator.belief = multivariate_normal(
+            mean=self.pose, cov=np.diag([1e-10, 1e-10, 1e-10])
+        )
+
+        # 奇跡の黒い線が残らないように消す
+        self.poses = []
+
+    def one_step(self, time_interval):
+        if self.agent.update_end:
+            with open("log.txt", "a") as f:
+                f.write("{}\n".format(self.agent.total_reward + self.agent.final_value))
+            self.reset()
+        else:
+            super().one_step(time_interval)
 
 
 class StateInfo:
@@ -129,7 +169,7 @@ class StateInfo:
 
 def trial():
     time_interval = 0.1
-    world = World(400000, time_interval, debug=False)  # 長時間アニメーションを取る
+    world = PuddleWorld(400000, time_interval, debug=False)  # 長時間アニメーションを取る
 
     m = Map()
     for ln in [(-4, 2), (2, -3), (4, 4), (-4, -4)]:
@@ -137,7 +177,7 @@ def trial():
     world.append(m)
 
     ## ゴールの追加
-    goal = Goal(-3, -3)
+    goal = Goal(-3, -3, radius=2)
     world.append(goal)
 
     ## 水たまりの追加
@@ -148,7 +188,7 @@ def trial():
     init_pose = np.array([3, 3, 0]).T
     kf = KalmanFilter(m, init_pose)
     a = QAgent(time_interval, kf)
-    r = Robot(
+    r = WarpRobot(
         init_pose,
         sensor=Camera(m, distance_bias_rate_stddev=0, direction_bias_stddev=0),
         agent=a,
