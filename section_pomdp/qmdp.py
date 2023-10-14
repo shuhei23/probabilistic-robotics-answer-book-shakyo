@@ -50,7 +50,7 @@ class QmdpAgent(DpPolicyAgent):
         self.evaluations = [self.evaluation(a, indexes) for a in self.dp.actions]
         self.history.append(self.dp.actions[np.argmax(self.evaluations)])
 
-        if self.history[-1][0] + self.history[-2][0] == 0.0 and self.history[-1][1] + self.history[-2][1] == 0.0
+        if self.history[-1][0] + self.history[-2][0] == 0.0 and self.history[-1][1] + self.history[-2][1] == 0.0:
             # 2回の行動で停止していたら強制的に前進
             return (1.0, 0.0)
 
