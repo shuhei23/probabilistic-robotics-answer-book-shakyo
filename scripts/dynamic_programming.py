@@ -37,7 +37,7 @@ class DynamicProgramming:
         )  # i = [0,0,0], [0,0,1], [0,0,2], ... [0,10,0]...
         self.state_transition_probs = self.init_state_transition_probs(
             time_interval, sampling_num
-        )
+        ) # init_state_transition_probs()の戻り値は辞書型
 
         self.depths = self.depth_means(
             puddles, sampling_num
